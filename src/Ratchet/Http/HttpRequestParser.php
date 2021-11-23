@@ -1,15 +1,17 @@
 <?php
 namespace Ratchet\Http;
-use Ratchet\MessageInterface;
+
+use GuzzleHttp\Psr7\Message;
 use Ratchet\ConnectionInterface;
-use GuzzleHttp\Psr7 as gPsr;
+use Ratchet\MessageInterface;
 
 /**
  * This class receives streaming data from a client request
  * and parses HTTP headers, returning a PSR-7 Request object
  * once it's been buffered
  */
-class HttpRequestParser implements MessageInterface {
+class HttpRequestParser implements MessageInterface
+{
     const EOM = "\r\n\r\n";
 
     /**
@@ -25,14 +27,15 @@ class HttpRequestParser implements MessageInterface {
      * @return \Psr\Http\Message\RequestInterface
      * @throws \OverflowException If the message buffer has become too large
      */
-    public function onMessage(ConnectionInterface $context, $data) {
+    public function onMessage(ConnectionInterface $context, $data)
+    {
         if (!isset($context->httpBuffer)) {
             $context->httpBuffer = '';
         }
 
         $context->httpBuffer .= $data;
 
-        if (strlen($context->httpBuffer) > (int)$this->maxSize) {
+        if (strlen($context->httpBuffer) > (int) $this->maxSize) {
             throw new \OverflowException("Maximum buffer size of {$this->maxSize} exceeded parsing HTTP header");
         }
 
@@ -50,15 +53,17 @@ class HttpRequestParser implements MessageInterface {
      * @param  string  $message
      * @return boolean
      */
-    public function isEom($message) {
-        return (boolean)strpos($message, static::EOM);
+    public function isEom($message)
+    {
+        return (boolean) strpos($message, static::EOM);
     }
 
     /**
      * @param string $headers
      * @return \Psr\Http\Message\RequestInterface
      */
-    public function parse($headers) {
-        return gPsr\parse_request($headers);
+    public function parse($headers)
+    {
+        return Message::parseRequest($headers);
     }
 }

@@ -1,20 +1,21 @@
 <?php
 namespace Ratchet\WebSocket;
+
+use GuzzleHttp\Psr7\Message;
+use Psr\Http\Message\RequestInterface;
 use Ratchet\ComponentInterface;
 use Ratchet\ConnectionInterface;
-use Ratchet\MessageComponentInterface as DataComponentInterface;
-use Ratchet\Http\HttpServerInterface;
 use Ratchet\Http\CloseResponseTrait;
-use Psr\Http\Message\RequestInterface;
-use Ratchet\RFC6455\Messaging\MessageInterface;
-use Ratchet\RFC6455\Messaging\FrameInterface;
-use Ratchet\RFC6455\Messaging\Frame;
-use Ratchet\RFC6455\Messaging\MessageBuffer;
-use Ratchet\RFC6455\Messaging\CloseFrameChecker;
-use Ratchet\RFC6455\Handshake\ServerNegotiator;
+use Ratchet\Http\HttpServerInterface;
+use Ratchet\MessageComponentInterface as DataComponentInterface;
 use Ratchet\RFC6455\Handshake\RequestVerifier;
+use Ratchet\RFC6455\Handshake\ServerNegotiator;
+use Ratchet\RFC6455\Messaging\CloseFrameChecker;
+use Ratchet\RFC6455\Messaging\Frame;
+use Ratchet\RFC6455\Messaging\FrameInterface;
+use Ratchet\RFC6455\Messaging\MessageBuffer;
+use Ratchet\RFC6455\Messaging\MessageInterface;
 use React\EventLoop\LoopInterface;
-use GuzzleHttp\Psr7 as gPsr;
 
 /**
  * The adapter to handle WebSocket requests/responses
@@ -22,7 +23,8 @@ use GuzzleHttp\Psr7 as gPsr;
  * @link http://ca.php.net/manual/en/ref.http.php
  * @link http://dev.w3.org/html5/websockets/
  */
-class WsServer implements HttpServerInterface {
+class WsServer implements HttpServerInterface
+{
     use CloseResponseTrait;
 
     /**
@@ -65,13 +67,14 @@ class WsServer implements HttpServerInterface {
      * @param \Ratchet\WebSocket\MessageComponentInterface|\Ratchet\MessageComponentInterface $component Your application to run with WebSockets
      * @note If you want to enable sub-protocols have your component implement WsServerInterface as well
      */
-    public function __construct(ComponentInterface $component) {
+    public function __construct(ComponentInterface $component)
+    {
         if ($component instanceof MessageComponentInterface) {
-            $this->msgCb = function(ConnectionInterface $conn, MessageInterface $msg) {
+            $this->msgCb = function (ConnectionInterface $conn, MessageInterface $msg) {
                 $this->delegate->onMessage($conn, $msg);
             };
         } elseif ($component instanceof DataComponentInterface) {
-            $this->msgCb = function(ConnectionInterface $conn, MessageInterface $msg) {
+            $this->msgCb = function (ConnectionInterface $conn, MessageInterface $msg) {
                 $this->delegate->onMessage($conn, $msg->getPayload());
             };
         } else {
@@ -93,10 +96,10 @@ class WsServer implements HttpServerInterface {
             $this->handshakeNegotiator->setSupportedSubProtocols($component->getSubProtocols());
         }
 
-        $this->pongReceiver = function() {};
+        $this->pongReceiver = function () {};
 
         $reusableUnderflowException = new \UnderflowException;
-        $this->ueFlowFactory = function() use ($reusableUnderflowException) {
+        $this->ueFlowFactory        = function () use ($reusableUnderflowException) {
             return $reusableUnderflowException;
         };
     }
@@ -104,19 +107,20 @@ class WsServer implements HttpServerInterface {
     /**
      * {@inheritdoc}
      */
-    public function onOpen(ConnectionInterface $conn, RequestInterface $request = null) {
+    public function onOpen(ConnectionInterface $conn, RequestInterface $request = null)
+    {
         if (null === $request) {
             throw new \UnexpectedValueException('$request can not be null');
         }
 
         $conn->httpRequest = $request;
 
-        $conn->WebSocket            = new \StdClass;
-        $conn->WebSocket->closing   = false;
+        $conn->WebSocket          = new \StdClass;
+        $conn->WebSocket->closing = false;
 
         $response = $this->handshakeNegotiator->handshake($request)->withHeader('X-Powered-By', \Ratchet\VERSION);
 
-        $conn->send(gPsr\str($response));
+        $conn->send(Message::toString($response));
 
         if (101 !== $response->getStatusCode()) {
             return $conn->close();
@@ -126,11 +130,11 @@ class WsServer implements HttpServerInterface {
 
         $streamer = new MessageBuffer(
             $this->closeFrameChecker,
-            function(MessageInterface $msg) use ($wsConn) {
+            function (MessageInterface $msg) use ($wsConn) {
                 $cb = $this->msgCb;
                 $cb($wsConn, $msg);
             },
-            function(FrameInterface $frame) use ($wsConn) {
+            function (FrameInterface $frame) use ($wsConn) {
                 $this->onControlFrame($frame, $wsConn);
             },
             true,
@@ -145,7 +149,8 @@ class WsServer implements HttpServerInterface {
     /**
      * {@inheritdoc}
      */
-    public function onMessage(ConnectionInterface $from, $msg) {
+    public function onMessage(ConnectionInterface $from, $msg)
+    {
         if ($from->WebSocket->closing) {
             return;
         }
@@ -156,7 +161,8 @@ class WsServer implements HttpServerInterface {
     /**
      * {@inheritdoc}
      */
-    public function onClose(ConnectionInterface $conn) {
+    public function onClose(ConnectionInterface $conn)
+    {
         if ($this->connections->contains($conn)) {
             $context = $this->connections[$conn];
             $this->connections->detach($conn);
@@ -168,7 +174,8 @@ class WsServer implements HttpServerInterface {
     /**
      * {@inheritdoc}
      */
-    public function onError(ConnectionInterface $conn, \Exception $e) {
+    public function onError(ConnectionInterface $conn, \Exception$e)
+    {
         if ($this->connections->contains($conn)) {
             $this->delegate->onError($this->connections[$conn]->connection, $e);
         } else {
@@ -176,7 +183,8 @@ class WsServer implements HttpServerInterface {
         }
     }
 
-    public function onControlFrame(FrameInterface $frame, WsConnection $conn) {
+    public function onControlFrame(FrameInterface $frame, WsConnection $conn)
+    {
         switch ($frame->getOpCode()) {
             case Frame::OP_CLOSE:
                 $conn->close($frame);
@@ -187,26 +195,28 @@ class WsServer implements HttpServerInterface {
             case Frame::OP_PONG:
                 $pongReceiver = $this->pongReceiver;
                 $pongReceiver($frame, $conn);
-            break;
+                break;
         }
     }
 
-    public function setStrictSubProtocolCheck($enable) {
+    public function setStrictSubProtocolCheck($enable)
+    {
         $this->handshakeNegotiator->setStrictSubProtocolCheck($enable);
     }
 
-    public function enableKeepAlive(LoopInterface $loop, $interval = 30) {
-        $lastPing = new Frame(uniqid(), true, Frame::OP_PING);
+    public function enableKeepAlive(LoopInterface $loop, $interval = 30)
+    {
+        $lastPing          = new Frame(uniqid(), true, Frame::OP_PING);
         $pingedConnections = new \SplObjectStorage;
-        $splClearer = new \SplObjectStorage;
+        $splClearer        = new \SplObjectStorage;
 
-        $this->pongReceiver = function(FrameInterface $frame, $wsConn) use ($pingedConnections, &$lastPing) {
+        $this->pongReceiver = function (FrameInterface $frame, $wsConn) use ($pingedConnections, &$lastPing) {
             if ($frame->getPayload() === $lastPing->getPayload()) {
                 $pingedConnections->detach($wsConn);
             }
         };
 
-        $loop->addPeriodicTimer((int)$interval, function() use ($pingedConnections, &$lastPing, $splClearer) {
+        $loop->addPeriodicTimer((int) $interval, function () use ($pingedConnections, &$lastPing, $splClearer) {
             foreach ($pingedConnections as $wsConn) {
                 $wsConn->close();
             }
@@ -215,11 +225,11 @@ class WsServer implements HttpServerInterface {
             $lastPing = new Frame(uniqid(), true, Frame::OP_PING);
 
             foreach ($this->connections as $key => $conn) {
-                $wsConn  = $this->connections[$conn]->connection;
+                $wsConn = $this->connections[$conn]->connection;
 
                 $wsConn->send($lastPing);
                 $pingedConnections->attach($wsConn);
             }
         });
-   }
+    }
 }

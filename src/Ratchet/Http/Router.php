@@ -1,13 +1,15 @@
 <?php
 namespace Ratchet\Http;
-use Ratchet\ConnectionInterface;
+
+use GuzzleHttp\Psr7\Query;
 use Psr\Http\Message\RequestInterface;
-use Symfony\Component\Routing\Matcher\UrlMatcherInterface;
+use Ratchet\ConnectionInterface;
 use Symfony\Component\Routing\Exception\MethodNotAllowedException;
 use Symfony\Component\Routing\Exception\ResourceNotFoundException;
-use GuzzleHttp\Psr7 as gPsr;
+use Symfony\Component\Routing\Matcher\UrlMatcherInterface;
 
-class Router implements HttpServerInterface {
+class Router implements HttpServerInterface
+{
     use CloseResponseTrait;
 
     /**
@@ -17,8 +19,9 @@ class Router implements HttpServerInterface {
 
     private $_noopController;
 
-    public function __construct(UrlMatcherInterface $matcher) {
-        $this->_matcher = $matcher;
+    public function __construct(UrlMatcherInterface $matcher)
+    {
+        $this->_matcher        = $matcher;
         $this->_noopController = new NoOpHttpServerController;
     }
 
@@ -26,7 +29,8 @@ class Router implements HttpServerInterface {
      * {@inheritdoc}
      * @throws \UnexpectedValueException If a controller is not \Ratchet\Http\HttpServerInterface
      */
-    public function onOpen(ConnectionInterface $conn, RequestInterface $request = null) {
+    public function onOpen(ConnectionInterface $conn, RequestInterface $request = null)
+    {
         if (null === $request) {
             throw new \UnexpectedValueException('$request can not be null');
         }
@@ -56,14 +60,14 @@ class Router implements HttpServerInterface {
         }
 
         $parameters = [];
-        foreach($route as $key => $value) {
+        foreach ($route as $key => $value) {
             if ((is_string($key)) && ('_' !== substr($key, 0, 1))) {
                 $parameters[$key] = $value;
             }
         }
-        $parameters = array_merge($parameters, gPsr\parse_query($uri->getQuery() ?: ''));
+        $parameters = array_merge($parameters, Query::parse($uri->getQuery() ?: ''));
 
-        $request = $request->withUri($uri->withQuery(gPsr\build_query($parameters)));
+        $request = $request->withUri($uri->withQuery(Query::build($parameters)));
 
         $conn->controller = $route['_controller'];
         $conn->controller->onOpen($conn, $request);
@@ -72,14 +76,16 @@ class Router implements HttpServerInterface {
     /**
      * {@inheritdoc}
      */
-    public function onMessage(ConnectionInterface $from, $msg) {
+    public function onMessage(ConnectionInterface $from, $msg)
+    {
         $from->controller->onMessage($from, $msg);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function onClose(ConnectionInterface $conn) {
+    public function onClose(ConnectionInterface $conn)
+    {
         if (isset($conn->controller)) {
             $conn->controller->onClose($conn);
         }
@@ -88,7 +94,8 @@ class Router implements HttpServerInterface {
     /**
      * {@inheritdoc}
      */
-    public function onError(ConnectionInterface $conn, \Exception $e) {
+    public function onError(ConnectionInterface $conn, \Exception$e)
+    {
         if (isset($conn->controller)) {
             $conn->controller->onError($conn, $e);
         }
